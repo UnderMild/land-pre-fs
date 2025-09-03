@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Land Pre-FS — Quick Feasibility Mockup (v7.1.1)</title>
+<style>
+  :root{
+    --bg:#0b0d10;--card:#13171c;--ink:#e7ecf3;--muted:#9fb0c6;
+    --lime:#a3ff3f; --teal:#56c2ff;
+    --bad:#ff6b6b;--ok:#ffd166;--good:#06d6a0
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,#0b0d10,#0f141a);color:var(--ink);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial}
+  .wrap{max-width:1100px;margin:32px auto;padding:0 16px}
+  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+  h1{font-size:1.25rem;margin:0}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .card{background:var(--card);border:1px solid #1e242c;border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  .card h2{margin:0 0 8px 0;font-size:1rem}
+  .row{display:grid;grid-template-columns:1fr 180px;gap:12px;align-items:center;margin:8px 0}
+  .row > label{font-size:.95rem;color:var(--muted)}
+  input[type="number"]{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #28303a;background:#0b0f14;color:var(--ink);font-size:.95rem}
+  input[type="number"].bad{border-color:var(--bad); box-shadow:0 0 0 3px rgba(255,107,107,.2)}
+  .hint{font-size:.8rem;color:var(--muted);margin-top:2px}
+  .twoway{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+  .chip{border:1px solid #2a3340;border-radius:999px;padding:6px 10px;cursor:pointer;color:var(--muted);user-select:none}
+  .chip.active{background:linear-gradient(90deg,var(--teal),#b4e1ff);color:#0a0f12;border-color:transparent;font-weight:700}
+
+  /* Output grid */
+  .pairs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .kpi{background:#0d1217;border:1px solid #223041;border-radius:14px;padding:12px}
+  .kpi .label{display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--muted)}
+  .kpi .value{font-size:1.15rem;font-weight:800;margin-top:4px}
+  .kpi.hl-teal{border:2px solid var(--teal);box-shadow:0 0 0 4px rgba(86,194,255,.15)}
+  .kpi.hl-lime{border:2px solid var(--lime);box-shadow:0 0 0 4px rgba(163,255,63,.15)}
+  .kpi.full{grid-column:1 / span 2}
+  .value.neg{color:var(--bad)}
+
+  .status{margin-top:10px;padding:10px 12px;border-radius:12px;font-weight:700}
+  .status.good{background:rgba(6,214,160,.12);border:1px solid rgba(6,214,160,.4);color:#84ffd6}
+  .status.ok{background:rgba(255,209,102,.12);border:1px solid rgba(255,209,102,.4);color:#ffe39a}
+  .status.bad{background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.35);color:#ffc2c2}
+  .status.info{background:rgba(86,194,255,.12);border:1px solid rgba(86,194,255,.35);color:#bfe4ff}
+
+  /* Highlights in inputs */
+  .tag{font-size:.7rem;border-radius:6px;padding:2px 6px;margin-left:8px;vertical-align:middle}
+  .tag.teal{background:linear-gradient(90deg,var(--teal),#b4e1ff);color:#0a0f12}
+  .tag.lime{background:linear-gradient(90deg,var(--lime),#d0ff9f);color:#0a0f12}
+  .inp.teal input{border-color:#3a7fa6;box-shadow:0 0 0 3px rgba(86,194,255,.15)}
+  .inp.lime input{border-color:#6edb2a;box-shadow:0 0 0 3px rgba(163,255,63,.15)}
+
+  /* Custom tooltip */
+  .tt{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;border-radius:50%;border:1px solid #2a3340;font-size:.7rem;color:#bfe4ff;background:#0e1319;cursor:pointer;line-height:1; padding:0 4px}
+  .tt:focus{outline:2px solid rgba(86,194,255,.6); outline-offset:2px}
+  .tt-wrap{position:relative; display:inline-block}
+  .tt-bubble{position:absolute; left:50%; transform:translateX(-50%); bottom:125%; min-width:200px; max-width:280px; background:#0e141b; color:#cfe6ff; border:1px solid #2b3a4d; border-radius:10px; padding:10px 12px; box-shadow:0 10px 30px rgba(0,0,0,.35); font-size:.8rem; line-height:1.35; z-index:9999; opacity:0; pointer-events:none; transition:opacity .12s ease}
+  .tt-bubble::after{content:""; position:absolute; top:100%; left:50%; transform:translateX(-50%); border-width:6px; border-style:solid; border-color:#2b3a4d transparent transparent transparent}
+  .tt-wrap[data-open="true"] .tt-bubble{opacity:1; pointer-events:auto}
+  /* ensure hover alone also opens bubble (desktop) */
+  .tt-wrap:hover .tt-bubble{opacity:1; pointer-events:auto}
+  @media (max-width:768px){ .tt-bubble{left:auto; right:0; transform:none; bottom:125%;} }
+
+  footer{opacity:.7;text-align:center;margin:20px 0;font-size:.8rem}
+
+  /* Mobile responsive */
+  @media (max-width: 768px){
+    .grid{grid-template-columns:1fr}
+    .pairs{grid-template-columns:1fr}
+    .kpi.hl-teal, .kpi.hl-lime{grid-column:1 / -1}
+    .kpi.full{grid-column:1 / -1}
+    .twoway{position:sticky; top:8px; background:linear-gradient(180deg,#13171c,#10151b); padding:8px 4px; border-radius:12px; z-index:5}
+    .row{grid-template-columns:1fr}
+    .kpi .value{font-size:1.2rem}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Land Pre-FS <span style="opacity:.6">• Quick Feasibility Mockup</span></h1>
+  </header>
+
+  <div class="grid">
+    <!-- INPUTS -->
+    <section class="card">
+      <h2>Inputs</h2>
+      <div class="hint">Highlight: <span class="tag teal">Teal = ต้องใส่</span> • <span class="tag lime">Lime = Two-way</span></div>
+
+      <h3 style="margin:12px 0 6px;color:#bfe4ff;font-size:.9rem;">Land info</h3>
+      <div class="row inp teal"><label>ไร่ <span class="tag teal">ต้องใส่</span></label><input id="rai" type="number" step="0.01" value="0" min="0"></div>
+      <div class="row inp teal"><label>งาน <span class="tag teal">ต้องใส่</span></label><input id="ngan" type="number" step="1" value="0" min="0"></div>
+      <div class="row inp teal"><label>ตารางวา <span class="tag teal">ต้องใส่</span></label><input id="sqw" type="number" step="1" value="0" min="0"></div>
+
+      <h3 style="margin:12px 0 6px;color:#bfe4ff;font-size:.9rem;">Zoning / Density</h3>
+      <div class="row inp teal">
+        <label>FAR (base)
+          <span class="tt-wrap">
+            <button class="tt" type="button" aria-label="FAR info" tabindex="0">i</button>
+            <span class="tt-bubble">Floor Area Ratio: อัตราส่วนพื้นที่ก่อสร้างรวมต่อพื้นที่ดิน</span>
+          </span>
+          <span class="tag teal">ต้องใส่</span>
+        </label>
+        <input id="far" type="number" step="0.1" value="0" min="0">
+      </div>
+      <div class="row inp teal">
+        <label>Bonus FAR (%)
+          <span class="tt-wrap">
+            <button class="tt" type="button" aria-label="Bonus FAR info" tabindex="0">i</button>
+            <span class="tt-bubble">ส่วนเพิ่ม FAR ตามเงื่อนไข (เช่น ติดถนนใหญ่, พื้นที่เปิดโล่ง) — แนะนำ ≤ 20% (เตือนถ้าเกิน)</span>
+          </span>
+          <span class="tag teal">ต้องใส่</span>
+        </label>
+        <input id="bonus_far_pct" type="number" step="1" min="0" value="0">
+      </div>
+      <div class="row inp teal">
+        <label>Efficiency (NSA/GFA) % 
+          <span class="tt-wrap">
+            <button class="tt" type="button" aria-label="Efficiency info" tabindex="0">i</button>
+            <span class="tt-bubble">ประสิทธิภาพพื้นที่ขายจริง (NSA) ต่อพื้นที่ก่อสร้างรวม (GFA). ตัวอย่าง: 80% หมายถึง NSA = 0.8 × GFA</span>
+          </span>
+          <span class="tag teal">ต้องใส่</span>
+        </label>
+        <input id="eff" type="number" step="1" value="80" min="0" max="100">
+      </div>
+
+      <h3 style="margin:12px 0 6px;color:#bfe4ff;font-size:.9rem;">Core Economics</h3>
+      <div class="row inp lime"><label>ราคาที่ดิน / ตร.วา <span class="tag lime">Two-way</span></label><input id="land_price_per_sqw" type="number" step="1" value="0" min="0"></div>
+      <div class="row inp teal"><label>ค่าธุรกรรมอื่นๆ (%) <span class="tag teal">ต้องใส่</span></label><input id="land_tax_pct" type="number" step="0.01" value="3" min="0" max="100"></div>
+      <div class="row inp lime"><label>ต้นทุนก่อสร้าง / ตร.ม. (GFA) <span class="tag lime">Two-way</span></label><input id="con_cost_per_gfa" type="number" step="100" value="24000" min="0"></div>
+      <div class="row inp lime"><label>ราคาขาย / ตร.ม. (NSA) <span class="tag lime">Two-way</span></label><input id="sell_price_per_nsa" type="number" step="100" value="65000" min="0"></div>
+      <div class="row inp teal">
+        <label>เป้ากำไรขั้นต้น (GM%) 
+          <span class="tt-wrap">
+            <button class="tt" type="button" aria-label="GM info" tabindex="0">i</button>
+            <span class="tt-bubble">Gross Margin: (SP − Land/NSA − CC/NSA) ÷ SP</span>
+          </span>
+          <span class="tag teal">ต้องใส่</span></label>
+        <input id="target_gm_pct" type="number" step="1" value="25" min="0" max="100">
+      </div>
+      <div class="row inp teal">
+        <label>NP% (after tax)
+          <span class="tt-wrap">
+            <button class="tt" type="button" aria-label="NP info" tabindex="0">i</button>
+            <span class="tt-bubble">กำไรสุทธิหลังภาษี — ผู้ใช้กำหนดเอง ใช้สำหรับคำนวณ Net Profit = PV × NP%</span>
+          </span>
+          <span class="tag teal">ต้องใส่</span></label>
+        <input id="np_pct" type="number" step="1" value="10" min="0" max="100">
+        <div class="hint">ตีความว่า NP% นี้เป็น <b>หลังภาษี</b> แล้ว โดยผู้ใช้กำหนดเอง</div>
+      </div>
+
+      <h3 style="margin:12px 0 6px;color:#bfe4ff;font-size:.9rem;">Units (Two-way w.r.t NSA)</h3>
+      <div class="row inp lime"><label>จำนวนยูนิต (units) <span class="tag lime">Two-way</span></label><input id="unit_count" type="number" step="1" value="0" min="0"></div>
+      <div class="row inp lime"><label>ขนาดยูนิตเฉลี่ย (ตร.ม./ยูนิต) <span class="tag lime">Two-way</span></label><input id="avg_unit_size" type="number" step="1" value="0" min="0"></div>
+
+      <h3 style="margin:12px 0 6px;color:#bfe4ff;font-size:.9rem;">Two-Way Solver</h3>
+      <div class="twoway">
+        <div class="chip active" data-solve="sell">Solve → ราคาขาย / ตร.ม. (NSA)</div>
+        <div class="chip" data-solve="land">Solve → ราคาที่ดิน / ตร.วา</div>
+        <div class="chip" data-solve="con">Solve → ต้นทุนก่อสร้าง / ตร.ม. (GFA)</div>
+      </div>
+      <div class="hint">GM = (SP − CC<sub>NSA</sub> − Land/NSA) / SP • CC<sub>NSA</sub> = CC<sub>GFA</sub>/Eff</div>
+
+      <div id="warn" class="status bad" style="display:none;margin-top:8px;"></div>
+      <div id="info" class="status info" style="display:none;margin-top:8px;"></div>
+    </section>
+
+    <!-- OUTPUTS -->
+    <section class="card">
+      <h2>Decision Output</h2>
+
+      <!-- Assumption Output -->
+      <h3 style="margin:4px 0 8px;color:#bfe4ff;font-size:.9rem;">Assumption Output</h3>
+      <div class="pairs">
+        <div class="kpi"><div class="label">พื้นที่ดิน (sq.w.)</div><div id="out_sqw" class="value">0</div></div>
+        <div class="kpi"><div class="label">พื้นที่ดิน (sq.m.)</div><div id="out_sqm" class="value">0</div></div>
+
+        <div class="kpi"><div class="label">GFA (sq.m.)
+          <span class="tt-wrap"><button class="tt" type="button" aria-label="GFA info" tabindex="0">i</button><span class="tt-bubble">Gross Floor Area: พื้นที่ก่อสร้างรวม</span></span>
+        </div><div id="out_gfa" class="value">0</div></div>
+        <div class="kpi"><div class="label">NSA (sq.m.)
+          <span class="tt-wrap"><button class="tt" type="button" aria-label="NSA info" tabindex="0">i</button><span class="tt-bubble">Net Saleable Area: พื้นที่ขายจริง = GFA × Efficiency</span></span>
+        </div><div id="out_nsa" class="value">0</div></div>
+
+        <div class="kpi hl-teal"><div class="label">Total Land cost (THB)</div><div id="out_land_total" class="value">-</div></div>
+        <div class="kpi hl-teal"><div class="label">Land cost / sq.w.</div><div id="out_land_per_sqw" class="value">-</div></div>
+
+        <div class="kpi hl-lime"><div class="label">Total Con Cost (THB)</div><div id="out_total_cc" class="value">-</div></div>
+        <div class="kpi hl-lime"><div class="label">Con cost / sq.m. (GFA)</div><div id="out_cc_gfa" class="value">-</div></div>
+
+        <div class="kpi"><div class="label">Total Dev Cost (THB)</div><div id="out_total_dev" class="value">-</div></div>
+        <div class="kpi"><div class="label">COGs %</div><div id="out_cogs_pct" class="value">-</div></div>
+
+        <div class="kpi"><div class="label">SG&amp;A % (auto = GM − NP)</div><div id="out_sga" class="value">-</div></div>
+        <div class="kpi"><div class="label">NP% (after tax)</div><div id="out_np_pct" class="value">-</div></div>
+
+        <div class="kpi hl-lime full"><div class="label">Selling price / sq.m. (NSA)</div><div id="out_sp" class="value">-</div></div>
+      </div>
+
+      <!-- Project Output -->
+      <h3 style="margin:12px 0 8px;color:#bfe4ff;font-size:.9rem;">Project Output</h3>
+      <div class="pairs">
+        <div class="kpi hl-lime"><div class="label">Project Value (ยอดขายรวม)</div><div id="out_pv" class="value">-</div></div>
+        <div class="kpi hl-lime"><div class="label">Net Profit (THB)</div><div id="out_np" class="value">-</div></div>
+
+        <div class="kpi"><div class="label">Total unit</div><div id="out_units" class="value">-</div></div>
+        <div class="kpi"><div class="label">AVG. unit size (sq.m.)</div><div id="out_avg" class="value">-</div></div>
+      </div>
+
+      <div id="status" class="status ok" style="margin-top:12px;">ผลลัพธ์จะแสดงที่นี่</div>
+      <div class="hint" id="gm_check" style="margin-top:6px;"></div>
+      <div class="hint" id="sum_check" style="margin-top:2px;"></div>
+    </section>
+  </div>
+
+  <footer>Land Pre-FS • For workshop & discussion only</footer>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n, digits=0) => (!isFinite(n) ? "-" : n.toLocaleString(undefined,{maximumFractionDigits:digits}));
+
+  // Tooltip: click/tap toggles, hover also opens via CSS
+  (function initTooltips(){
+    function closeAll(){ document.querySelectorAll('.tt-wrap[data-open=\"true\"]').forEach(el=>el.setAttribute('data-open','false')); }
+    document.addEventListener('click', (e)=>{
+      const isBtn = e.target.classList && e.target.classList.contains('tt');
+      const wrap = e.target.closest && e.target.closest('.tt-wrap');
+      if (isBtn && wrap){
+        const isOpen = wrap.getAttribute('data-open') === 'true';
+        closeAll();
+        wrap.setAttribute('data-open', isOpen ? 'false' : 'true');
+      } else if (!e.target.closest || !e.target.closest('.tt-wrap')){
+        closeAll();
+      }
+    });
+    document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') closeAll(); });
+  })();
+
+  // State
+  const chips = document.querySelectorAll('.chip');
+  let solveMode = 'sell';
+  let lastChanged = null;
+
+  chips.forEach(ch=>{
+    ch.addEventListener('click',()=>{
+      chips.forEach(c=>c.classList.remove('active'));
+      ch.classList.add('active');
+      solveMode = ch.dataset.solve;
+      calc();
+    })
+  });
+
+  const inputs = ['rai','ngan','sqw','far','bonus_far_pct','eff','land_price_per_sqw','land_tax_pct','con_cost_per_gfa','sell_price_per_nsa','target_gm_pct','np_pct','unit_count','avg_unit_size'];
+  inputs.forEach(id => { $(id).addEventListener('input', ()=>{ if (id==='unit_count'||id==='avg_unit_size') lastChanged=id; calc(); }); });
+
+  function safe(v){ const n = Number(v); return isFinite(n) ? n : 0; }
+  function setText(elId, value, digits=0){ const el=$(elId); if(!el) return; if(isFinite(value)){ el.textContent=fmt(value,digits); if(value<0) el.classList.add('neg'); else el.classList.remove('neg'); } else { el.textContent='-'; el.classList.remove('neg'); } }
+  function addWarn(list, msg){ if (msg && !list.includes(msg)) list.push(msg); }
+  function markBad(id, bad=true){ const el=$(id); if(el) (bad?el.classList.add('bad'):el.classList.remove('bad')); }
+
+  function calc(){
+    const warns = [];
+    const rai=safe($('rai').value), ngan=safe($('ngan').value), sqw=safe($('sqw').value);
+    const far=safe($('far').value), bfar_pct=safe($('bonus_far_pct').value), effPct=safe($('eff').value);
+    let lp_sqw=safe($('land_price_per_sqw').value), transPct=safe($('land_tax_pct').value)/100;
+    let cc_gfa=safe($('con_cost_per_gfa').value), sp=safe($('sell_price_per_nsa').value);
+    const gmT=safe($('target_gm_pct').value)/100, npT=safe($('np_pct').value)/100, eff=effPct/100;
+
+    ['far','eff','bonus_far_pct','sell_price_per_nsa','con_cost_per_gfa','land_price_per_sqw','np_pct','target_gm_pct'].forEach(id=>markBad(id,false));
+    if (far <= 0){ addWarn(warns,"FAR ต้องมากกว่า 0"); markBad('far',true); }
+    if (effPct <= 0 || effPct > 100){ addWarn(warns,"Efficiency ต้องอยู่ระหว่าง 0–100%"); markBad('eff',true); }
+    if (bfar_pct > 20){ addWarn(warns,"Bonus FAR > 20% (เตือน)"); markBad('bonus_far_pct',true); }
+    if (sp < 0){ addWarn(warns,"ราคาขาย/ตร.ม. (NSA) ต้อง ≥ 0"); markBad('sell_price_per_nsa',true); }
+    if (cc_gfa < 0){ addWarn(warns,"ต้นทุนก่อสร้าง/ตร.ม. (GFA) ต้อง ≥ 0"); markBad('con_cost_per_gfa',true); }
+    if (lp_sqw < 0){ addWarn(warns,"ราคาที่ดิน/ตร.วา ต้อง ≥ 0"); markBad('land_price_per_sqw',true); }
+    if (npT > gmT){ addWarn(warns,"NP% (after tax) ควรไม่มากกว่า GM%"); markBad('np_pct',true); }
+
+    const land_sqw=rai*400 + ngan*100 + sqw, land_sqm=land_sqw*4;
+    const totalFAR=far*(1+bfar_pct/100), gfa=land_sqm*totalFAR, nsa=gfa*eff;
+    if (nsa <= 0) addWarn(warns,"NSA ต้องมากกว่า 0 (ตรวจ FAR/Eff/ที่ดิน)");
+
+    const land_total=land_sqw*lp_sqw*(1+transPct), land_per_sqw=(land_sqw>0)? land_total/land_sqw:NaN;
+    const cc_nsa=(eff>0)? (cc_gfa/eff):Infinity, land_per_nsa=(nsa>0)? land_total/nsa:Infinity;
+
+    if (solveMode==='sell'){
+      const denom=1-gmT;
+      if (denom<=0 || !isFinite(cc_nsa) || !isFinite(land_per_nsa)){ addWarn(warns,"Solve ราคาขายไม่ได้ (ตรวจ GM%<100%, Eff>0, NSA>0)"); }
+      else { sp=(cc_nsa+land_per_nsa)/denom; $('sell_price_per_nsa').value = isFinite(sp)? sp.toFixed(0): $('sell_price_per_nsa').value; }
+    } else if (solveMode==='con'){
+      if (!isFinite(land_per_nsa) || !isFinite(sp) || eff<=0){ addWarn(warns,"Solve ต้นทุนก่อสร้างไม่ได้ (ตรวจ Eff>0, NSA>0)"); }
+      else { const cc_nsa_t=sp*(1-gmT)-land_per_nsa, cc_gfa_new=cc_nsa_t*eff; if (isFinite(cc_gfa_new)) $('con_cost_per_gfa').value=cc_gfa_new.toFixed(0); }
+    } else if (solveMode==='land'){
+      if (land_sqw<=0 || !isFinite(sp) || !isFinite(nsa)){ addWarn(warns,"Solve ราคาที่ดินไม่ได้ (ตรวจที่ดิน>0, NSA>0)"); }
+      else { const desired_land_per_nsa=sp*(1-gmT)-cc_nsa, allowed_land_total=desired_land_per_nsa*nsa, lp_new=(land_sqw>0)? allowed_land_total/(land_sqw*(1+transPct)):NaN; if (isFinite(lp_new)) $('land_price_per_sqw').value=lp_new.toFixed(0); }
+    }
+
+    const cc_nsa_now=(eff>0)? (safe($('con_cost_per_gfa').value)/eff):Infinity, sp_now=safe($('sell_price_per_nsa').value);
+    const total_cc=isFinite(gfa)? safe($('con_cost_per_gfa').value)*gfa:NaN;
+    const total_dev=(isFinite(total_cc)&&isFinite(land_total))? (total_cc+land_total):NaN;
+    const pv=(isFinite(nsa)&&isFinite(sp_now))? (nsa*sp_now):NaN, cogs_pct=(pv>0&&isFinite(total_dev))? (total_dev/pv*100):NaN;
+    const net_profit=isFinite(pv)? pv*npT:NaN;
+
+    let units=Math.max(0,Math.floor(safe($('unit_count').value))), avg=safe($('avg_unit_size').value);
+    if (nsa>0){
+      if (lastChanged==='unit_count' && units>0){ avg=nsa/units; $('avg_unit_size').value=isFinite(avg)? avg.toFixed(1):$('avg_unit_size').value; }
+      else if (lastChanged==='avg_unit_size' && avg>0){ const unitsNew=Math.floor(nsa/avg); if(isFinite(unitsNew)&&unitsNew>0) $('unit_count').value=unitsNew; units=Math.max(1,unitsNew); }
+    }
+
+    const gm_calc=sp_now>0? ((sp_now-cc_nsa_now-land_per_nsa)/sp_now):NaN;
+    const status=$('status'); let cls='ok', msg='';
+    if (!isFinite(gm_calc)){ cls='bad'; msg='กรอกข้อมูลให้ครบ • NSA ต้องมากกว่า 0 เพื่อคำนวณ'; }
+    else if (gm_calc<=0){ cls='bad'; msg=`ไม่ผ่าน (GM ≤ 0%)`; }
+    else { const gmPct=gm_calc*100; if (gmPct>=28){ cls='good'; msg=`ผ่านดี • GM ≈ ${gmPct.toFixed(1)}%`; } else if (gmPct>=20){ cls='ok'; msg=`พอได้ • GM ≈ ${gmPct.toFixed(1)}%`; } else { cls='bad'; msg=`ต่ำกว่าเป้า • GM ≈ ${gmPct.toFixed(1)}%`; } }
+    status.className='status '+cls; status.textContent=msg;
+
+    const warnBox=$('warn'); if (warns.length>0){ warnBox.style.display='block'; warnBox.textContent=warns.join(' • ');} else { warnBox.style.display='none'; warnBox.textContent=''; }
+
+    const gm_target_pct=(gmT*100).toFixed(1), sga_pct=(gmT*100)-(npT*100), np_pct=(npT*100), gm_from_sganp=sga_pct+np_pct;
+    $('gm_check').textContent = `GM (auto sum from SG&A% + NP%) = ${isFinite(gm_from_sganp)? gm_from_sganp.toFixed(1)+'%':'-'} • Target GM = ${gm_target_pct}%`;
+    $('sum_check').textContent = isFinite(cogs_pct)? `Check: COGs% (${cogs_pct.toFixed(1)}%) + GM(calc)% (${isFinite(gm_calc)? (gm_calc*100).toFixed(1): '-' }%) ≈ 100%` : '';
+
+    setText('out_sqw',land_sqw); setText('out_sqm',land_sqm); setText('out_gfa',gfa); setText('out_nsa',nsa);
+    setText('out_land_total',land_total); setText('out_land_per_sqw',land_per_sqw);
+    setText('out_total_cc',total_cc); setText('out_cc_gfa',safe($('con_cost_per_gfa').value));
+    setText('out_total_dev',total_dev);
+    $('out_cogs_pct').textContent=isFinite(cogs_pct)? cogs_pct.toFixed(2)+'%':'-';
+    const sgaEl=$('out_sga'); if (isFinite(sga_pct)){ sgaEl.textContent=sga_pct.toFixed(1)+'%'; if (sga_pct<0) sgaEl.classList.add('neg'); else sgaEl.classList.remove('neg'); } else { sgaEl.textContent='-'; sgaEl.classList.remove('neg'); }
+    $('out_np_pct').textContent=isFinite(np_pct)? np_pct.toFixed(1)+'%':'-';
+    setText('out_sp',sp_now);
+    setText('out_pv',pv); setText('out_np',net_profit);
+    $('out_units').textContent=(units>0&&isFinite(units))? units.toLocaleString():'-';
+    $('out_avg').textContent=(avg>0&&isFinite(avg))? avg.toFixed(1):'-';
+  }
+  calc();
+</script>
+</body>
+</html>
