@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Land Pre-FS — Refactored (v8 + Sensitivity)</title>
+<style>
+  :root{
+    --bg:#0b0d10;--card:#13171c;--ink:#e7ecf3;--muted:#9fb0c6;
+    --lime:#a3ff3f;--teal:#56c2ff;--orange:#ff9f43;
+    --bad:#ff6b6b;--ok:#ffd166;--good:#06d6a0
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,#0b0d10,#0f141a);color:var(--ink);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial;font-size:14px}
+  .wrap{max-width:1200px;margin:32px auto;padding:0 16px}
+  
+  /* Header with actions */
+  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+  h1{font-size:1.4rem;margin:0}
+  .header-actions{display:flex;gap:12px}
+  .btn{padding:8px 16px;border-radius:8px;border:1px solid #2a3340;background:linear-gradient(135deg,#1a1f26,#13171c);color:var(--ink);cursor:pointer;font-size:.85rem;transition:all .15s ease}
+  .btn:hover{background:linear-gradient(135deg,#2a3340,#1a1f26);border-color:#3a4a5a}
+  .btn.primary{background:linear-gradient(135deg,var(--teal),#4ab8ff);color:#0a0f12;border-color:transparent;font-weight:600}
+  .btn.primary:hover{background:linear-gradient(135deg,#4ab8ff,var(--teal))}
+
+  /* Grid layout */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .card{background:var(--card);border:1px solid #1e242c;border-radius:16px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  .card h2{margin:0 0 12px 0;font-size:1.1rem;color:#bfe4ff}
+
+  /* Form styling */
+  .form-section{margin:20px 0}
+  .form-section h3{margin:0 0 12px;color:#bfe4ff;font-size:.95rem;font-weight:600}
+  .form-row{display:grid;grid-template-columns:1fr 160px;gap:12px;align-items:center;margin:12px 0}
+  .form-row label{font-size:.9rem;color:var(--muted);display:flex;align-items:center;gap:8px}
+  
+  input[type="number"], select{
+    width:100%;padding:10px 14px;border-radius:10px;border:1px solid #28303a;
+    background:#0b0f14;color:var(--ink);font-size:.9rem;transition:all .15s ease
+  }
+  input[type="number"]:focus, select:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(86,194,255,.15);outline:none}
+  input[type="number"].error{border-color:var(--bad);box-shadow:0 0 0 3px rgba(255,107,107,.2)}
+  input[type="number"].warning{border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,159,67,.2)}
+
+  /* Tags and highlights */
+  .tag{font-size:.7rem;border-radius:6px;padding:2px 6px;vertical-align:middle;font-weight:600}
+  .tag.teal{background:linear-gradient(90deg,var(--teal),#b4e1ff);color:#0a0f12}
+  .tag.lime{background:linear-gradient(90deg,var(--lime),#d0ff9f);color:#0a0f12}
+  .tag.orange{background:linear-gradient(90deg,var(--orange),#ffa366);color:#0a0f12}
+
+  /* Solver chips */
+  .solver-section{background:#0e1419;border:1px solid #1a2129;border-radius:12px;padding:16px;margin:16px 0}
+  .solver-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .chip{
+    border:1px solid #2a3340;border-radius:20px;padding:8px 14px;cursor:pointer;
+    color:var(--muted);background:#13171c;font-size:.85rem;transition:all .15s ease;user-select:none
+  }
+  .chip.active{background:linear-gradient(90deg,var(--teal),#b4e1ff);color:#0a0f12;border-color:transparent;font-weight:700}
+  .chip:hover:not(.active){background:#1a1f26;border-color:#3a4a5a}
+
+  /* Output grid */
+  .output-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
+  .kpi{
+    background:#0d1217;border:1px solid #223041;border-radius:12px;padding:14px;
+    transition:all .15s ease
+  }
+  .kpi:hover{background:#0f1419;border-color:#2a3a4d}
+  .kpi .label{
+    display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--muted);
+    margin-bottom:6px;font-weight:500
+  }
+  .kpi .value{font-size:1.2rem;font-weight:800;color:var(--ink)}
+  .kpi .value.negative{color:var(--bad)}
+  .kpi .value.positive{color:var(--good)}
+  .kpi.highlight-teal{border:2px solid var(--teal);box-shadow:0 0 0 3px rgba(86,194,255,.1)}
+  .kpi.highlight-lime{border:2px solid var(--lime);box-shadow:0 0 0 3px rgba(163,255,63,.1)}
+  .kpi.full-width{grid-column:1 / -1}
+
+  /* Status indicators */
+  .status{margin:16px 0;padding:12px 16px;border-radius:12px;font-weight:600;font-size:.9rem}
+  .status.good{background:rgba(6,214,160,.12);border:1px solid rgba(6,214,160,.4);color:#84ffd6}
+  .status.ok{background:rgba(255,209,102,.12);border:1px solid rgba(255,209,102,.4);color:#ffe39a}
+  .status.bad{background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.35);color:#ffc2c2}
+  .status.info{background:rgba(86,194,255,.12);border:1px solid rgba(86,194,255,.35);color:#bfe4ff}
+
+  /* Alerts */
+  .alert{margin:12px 0;padding:10px 12px;border-radius:8px;font-size:.85rem;display:none}
+  .alert.error{background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.3);color:#ffc2c2}
+  .alert.warning{background:rgba(255,159,67,.1);border:1px solid rgba(255,159,67,.3);color:#ffcc9a}
+
+  /* Tooltips */
+  .tooltip{position:relative;display:inline-block}
+  .tooltip-trigger{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:18px;height:18px;border-radius:50%;border:1px solid #2a3340;
+    font-size:.7rem;color:#bfe4ff;background:#0e1319;cursor:help;
+    transition:all .15s ease
+  }
+  .tooltip-trigger:hover{background:#1a2129;border-color:#3a4a5a}
+  .tooltip-content{
+    position:absolute;left:50%;transform:translateX(-50%);bottom:125%;
+    min-width:200px;max-width:300px;background:#0e141b;color:#cfe6ff;
+    border:1px solid #2b3a4d;border-radius:10px;padding:10px 12px;
+    box-shadow:0 10px 30px rgba(0,0,0,.4);font-size:.8rem;line-height:1.4;
+    z-index:1000;opacity:0;pointer-events:none;transition:opacity .2s ease
+  }
+  .tooltip:hover .tooltip-content{opacity:1;pointer-events:auto}
+  .tooltip-content::after{
+    content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);
+    border-width:6px;border-style:solid;
+    border-color:#2b3a4d transparent transparent transparent
+  }
+
+  .hint{font-size:.8rem;color:var(--muted);margin-top:4px;line-height:1.3}
+
+  /* Mobile responsive */
+  @media (max-width: 768px){
+    .grid{grid-template-columns:1fr}
+    .output-grid{grid-template-columns:1fr}
+    .form-row{grid-template-columns:1fr}
+    .kpi.full-width{grid-column:1 / -1}
+    .solver-chips{position:sticky;top:8px;background:linear-gradient(180deg,#13171c,#10151b);padding:12px;border-radius:12px;z-index:10}
+    .header-actions{flex-direction:column;gap:8px}
+    .wrap{padding:0 12px}
+  }
+
+  footer{text-align:center;margin:32px 0;font-size:.8rem;opacity:.7}
+
+  /* Sensitivity Lab */
+  .lab-grid{display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-top:8px}
+  .table-wrap{max-height:340px;overflow:auto;border:1px solid #223041;border-radius:12px}
+  table{width:100%;border-collapse:collapse;font-size:.9rem}
+  th, td{padding:8px 10px;border-bottom:1px solid #223041}
+  th{position:sticky;top:0;background:#0f1419;text-align:left;color:#bfe4ff}
+  tr:hover td{background:#0e1218}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Land Pre-FS <span style="opacity:.6">• Refactored v8 + Sensitivity</span></h1>
+    <div class="header-actions">
+      <button class="btn" onclick="calculator.reset()">Reset</button>
+      <button class="btn" onclick="calculator.exportData()">Export</button>
+      <button class="btn primary" onclick="calculator.savePreset()">Save Preset</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- INPUT PANEL -->
+    <section class="card">
+      <h2>Project Inputs</h2>
+      
+      <div class="alert error" id="errorAlert"></div>
+      <div class="alert warning" id="warningAlert"></div>
+
+      <div class="form-section">
+        <h3>Land Information</h3>
+        <div class="form-row">
+          <label>ไร่ <span class="tag teal">Required</span></label>
+          <input type="number" id="rai" min="0" step="0.01" value="0">
+        </div>
+        <div class="form-row">
+          <label>งาน <span class="tag teal">Required</span></label>
+          <input type="number" id="ngan" min="0" step="1" value="0">
+        </div>
+        <div class="form-row">
+          <label>ตารางวา <span class="tag teal">Required</span></label>
+          <input type="number" id="sqw" min="0" step="1" value="0">
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>Development Parameters</h3>
+        <div class="form-row">
+          <label>
+            Base FAR
+            <div class="tooltip">
+              <span class="tooltip-trigger">?</span>
+              <div class="tooltip-content">Floor Area Ratio: อัตราส่วนพื้นที่ก่อสร้างรวมต่อพื้นที่ดิน</div>
+            </div>
+            <span class="tag teal">Required</span>
+          </label>
+          <input type="number" id="far" min="0" step="0.1" value="0">
+        </div>
+        <div class="form-row">
+          <label>
+            Bonus FAR (%)
+            <div class="tooltip">
+              <span class="tooltip-trigger">?</span>
+              <div class="tooltip-content">ส่วนเพิ่ม FAR ตามเงื่อนไข (เช่น ติดถนนใหญ่, พื้นที่เปิดโล่ง)</div>
+            </div>
+            <span class="tag orange">Optional</span>
+          </label>
+          <input type="number" id="bonusFar" min="0" max="25" step="1" value="0">
+        </div>
+        <div class="form-row">
+          <label>
+            Efficiency (%)
+            <div class="tooltip">
+              <span class="tooltip-trigger">?</span>
+              <div class="tooltip-content">ประสิทธิภาพพื้นที่ขายจริง (NSA) ต่อพื้นที่ก่อสร้างรวม (GFA)</div>
+            </div>
+            <span class="tag teal">Required</span>
+          </label>
+          <input type="number" id="efficiency" min="50" max="95" step="1" value="80">
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>Financial Parameters</h3>
+        <div class="form-row">
+          <label>ราคาที่ดิน/ตร.วา <span class="tag lime">Solver</span></label>
+          <input type="number" id="landPrice" min="0" step="1000" value="0">
+        </div>
+        <div class="form-row">
+          <label>ค่าธรรกรรมอื่นๆ (%) <span class="tag teal">Required</span></label>
+          <input type="number" id="landTax" min="0" max="10" step="0.1" value="3">
+        </div>
+        <div class="form-row">
+          <label>ค่าก่อสร้าง/ตร.ม. (GFA) <span class="tag lime">Solver</span></label>
+          <input type="number" id="constructionCost" min="0" step="1000" value="24000">
+        </div>
+        <div class="form-row">
+          <label>ราคาขาย/ตร.ม. (NSA) <span class="tag lime">Solver</span></label>
+          <input type="number" id="sellingPrice" min="0" step="1000" value="65000">
+        </div>
+        <div class="form-row">
+          <label>
+            Target GM (%)
+            <div class="tooltip">
+              <span class="tooltip-trigger">?</span>
+              <div class="tooltip-content">เป้าหมายกำไรขั้นต้น: (SP - Land/NSA - CC/NSA) ÷ SP</div>
+            </div>
+            <span class="tag teal">Required</span>
+          </label>
+          <input type="number" id="targetGM" min="0" max="60" step="1" value="25">
+        </div>
+        <div class="form-row">
+          <label>
+            Net Profit (%)
+            <div class="tooltip">
+              <span class="tooltip-trigger">?</span>
+              <div class="tooltip-content">กำไรสุทธิหลังภาษี - สำหรับคำนวณ Net Profit = PV × NP%</div>
+            </div>
+            <span class="tag teal">Required</span>
+          </label>
+          <input type="number" id="netProfitPct" min="0" max="30" step="1" value="10">
+        </div>
+      </div>
+
+      <div class="solver-section">
+        <h3>Two-Way Solver</h3>
+        <div class="solver-chips">
+          <div class="chip active" data-solve="selling">Solve → ราคาขาย</div>
+          <div class="chip" data-solve="land">Solve → ราคาที่ดิน</div>
+          <div class="chip" data-solve="construction">Solve → ค่าก่อสร้าง</div>
+        </div>
+        <div class="hint">เลือกตัวแปรที่ต้องการให้ระบบคำนวณให้อัตโนมัติ</div>
+      </div>
+    </section>
+
+    <!-- OUTPUT PANEL -->
+    <section class="card">
+      <h2>Analysis Results</h2>
+
+      <div class="form-section">
+        <h3>Project Scale</h3>
+        <div class="output-grid">
+          <div class="kpi">
+            <div class="label">พื้นที่ดิน (ตร.ว.)</div>
+            <div class="value" id="outputLandSqw">0</div>
+          </div>
+          <div class="kpi">
+            <div class="label">พื้นที่ดิน (ตร.ม.)</div>
+            <div class="value" id="outputLandSqm">0</div>
+          </div>
+          <div class="kpi">
+            <div class="label">GFA (ตร.ม.)</div>
+            <div class="value" id="outputGFA">0</div>
+          </div>
+          <div class="kpi">
+            <div class="label">NSA (ตร.ม.)</div>
+            <div class="value" id="outputNSA">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>Cost Analysis</h3>
+        <div class="output-grid">
+          <div class="kpi highlight-teal">
+            <div class="label">Total Land Cost</div>
+            <div class="value" id="outputTotalLandCost">-</div>
+          </div>
+          <div class="kpi highlight-lime">
+            <div class="label">Total Construction Cost</div>
+            <div class="value" id="outputTotalConCost">-</div>
+          </div>
+          <div class="kpi">
+            <div class="label">Total Development Cost</div>
+            <div class="value" id="outputTotalDevCost">-</div>
+          </div>
+          <div class="kpi">
+            <div class="label">COGs (%)</div>
+            <div class="value" id="outputCOGS">-</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>Financial Performance</h3>
+        <div class="output-grid">
+          <div class="kpi highlight-lime full-width">
+            <div class="label">Project Value (ยอดขายรวม)</div>
+            <div class="value" id="outputProjectValue">-</div>
+          </div>
+          <div class="kpi">
+            <div class="label">Gross Margin (%)</div>
+            <div class="value" id="outputGM">-</div>
+          </div>
+          <div class="kpi">
+            <div class="label">Net Profit (THB)</div>
+            <div class="value" id="outputNetProfit">-</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="status" id="feasibilityStatus">
+        กำลังคำนวณ...
+      </div>
+
+      <div class="hint" id="validationSummary"></div>
+    </section>
+  </div>
+
+  <!-- Sensitivity Analysis Lab -->
+  <section class="card" style="margin-top:20px;">
+    
+    <h2>Analysis Lab — One‑way Sensitivity (KPI = Required Selling Price/ตร.ม.)</h2>
+    <div class="lab-grid">
+      <div>
+        <div class="form-row">
+          <label>Parameter</label>
+          <select id="senParam">
+            <option value="constructionCost">ค่าก่อสร้าง/ตร.ม. (GFA)</option>
+            <option value="landPrice">ราคาที่ดิน/ตร.วา</option>
+            <option value="efficiency">Efficiency (%)</option>
+            <option value="far">FAR (base)</option>
+          </select>
+        </div>
+        <div class="form-row"><label>Min</label><input type="number" id="senMin" value="20000"></div>
+        <div class="form-row"><label>Max</label><input type="number" id="senMax" value="60000"></div>
+        <div class="form-row"><label>Steps</label><input type="number" id="senSteps" value="11" min="3" max="51"></div>
+        <div class="form-row"><label>Increment (tick)</label><input type="number" id="senInc" value="0" step="1"></div>
+        <div class="hint">ใส่ Increment (เช่น 500 หรือ 1000) เพื่อให้ค่าพารามิเตอร์เป็นจำนวนลงตัว • ถ้าค่านี้ &gt; 0 ระบบจะไม่ใช้จำนวน Steps</div>
+        <div class="form-row">
+          <button class="btn primary" id="runSen">Run Sensitivity</button>
+          <button class="btn" id="exportCSV">Export CSV</button>
+        </div>
+        <div class="hint">Required SP = (Land/NSA + Con/NSA) ÷ (1 − Target GM)</div>
+      </div>
+      <div>
+        <canvas id="senChart" height="180"></canvas>
+        <div class="table-wrap" style="margin-top:12px;">
+          <table id="senTable">
+            <thead>
+              <tr><th>#</th><th>Parameter</th><th>Required SP/ตร.ม.</th><th>GM(calc)%</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <footer>
+    Land Pre-FS • Advanced Feasibility Analysis Tool
+  </footer>
+</div>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+class LandFeasibilityCalculator {
+  constructor() {
+    this.solverMode = 'selling';
+    this.isCalculating = false;
+    this.validationErrors = [];
+    this.validationWarnings = [];
+    this.senData = []; // sensitivity cache
+    this.senChart = null;
+    
+    this.initializeElements();
+    this.bindEvents();
+    this.calculate();
+  }
+
+  initializeElements() {
+    // Cache DOM elements to avoid repeated queries
+    this.elements = {
+      // Inputs
+      rai: document.getElementById('rai'),
+      ngan: document.getElementById('ngan'),
+      sqw: document.getElementById('sqw'),
+      far: document.getElementById('far'),
+      bonusFar: document.getElementById('bonusFar'),
+      efficiency: document.getElementById('efficiency'),
+      landPrice: document.getElementById('landPrice'),
+      landTax: document.getElementById('landTax'),
+      constructionCost: document.getElementById('constructionCost'),
+      sellingPrice: document.getElementById('sellingPrice'),
+      targetGM: document.getElementById('targetGM'),
+      netProfitPct: document.getElementById('netProfitPct'),
+      
+      // Outputs
+      outputLandSqw: document.getElementById('outputLandSqw'),
+      outputLandSqm: document.getElementById('outputLandSqm'),
+      outputGFA: document.getElementById('outputGFA'),
+      outputNSA: document.getElementById('outputNSA'),
+      outputTotalLandCost: document.getElementById('outputTotalLandCost'),
+      outputTotalConCost: document.getElementById('outputTotalConCost'),
+      outputTotalDevCost: document.getElementById('outputTotalDevCost'),
+      outputCOGS: document.getElementById('outputCOGS'),
+      outputProjectValue: document.getElementById('outputProjectValue'),
+      outputGM: document.getElementById('outputGM'),
+      outputNetProfit: document.getElementById('outputNetProfit'),
+      
+      // Status
+      feasibilityStatus: document.getElementById('feasibilityStatus'),
+      validationSummary: document.getElementById('validationSummary'),
+      errorAlert: document.getElementById('errorAlert'),
+      warningAlert: document.getElementById('warningAlert'),
+
+      // Sensitivity elements
+      senParam: document.getElementById('senParam'),
+      senMin: document.getElementById('senMin'),
+      senMax: document.getElementById('senMax'),
+      senSteps: document.getElementById('senSteps'),
+      senInc: document.getElementById('senInc'),
+      senKPI: document.getElementById('senKPI'),
+      senSolver: document.getElementById('senSolver'),
+      runSen: document.getElementById('runSen'),
+      exportCSV: document.getElementById('exportCSV'),
+      senTableBody: document.querySelector('#senTable tbody'),
+      senChartCanvas: document.getElementById('senChart')
+    };
+  }
+
+  bindEvents() {
+    // Input change events with debouncing
+    const inputIds = ['rai', 'ngan', 'sqw', 'far', 'bonusFar', 'efficiency', 
+                     'landPrice', 'landTax', 'constructionCost', 'sellingPrice', 
+                     'targetGM', 'netProfitPct'];
+    
+    inputIds.forEach(id => {
+      const element = this.elements[id];
+      if (element) {
+        element.addEventListener('input', this.debounce(() => this.calculate(), 150));
+        element.addEventListener('blur', () => this.validateInput(element));
+      }
+    });
+
+    // Solver mode selection
+    document.querySelectorAll('.chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        this.solverMode = chip.dataset.solve;
+        this.calculate();
+      });
+    });
+
+    // Sensitivity
+    this.elements.runSen.addEventListener('click', () => this.runSensitivity());
+    this.elements.exportCSV.addEventListener('click', () => this.exportSensitivityCSV());
+  }
+
+  debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+
+  validateInput(element) {
+    const value = parseFloat(element.value) || 0;
+    const id = element.id;
+    
+    element.classList.remove('error', 'warning');
+    if (value < 0) { element.classList.add('error'); return false; }
+    switch (id) {
+      case 'far':
+        if (value === 0) { element.classList.add('error'); return false; }
+        if (value > 10) { element.classList.add('warning'); }
+        break;
+      case 'bonusFar':
+        if (value > 20) { element.classList.add('warning'); }
+        break;
+      case 'efficiency':
+        if (value < 50 || value > 95) { element.classList.add('warning'); }
+        break;
+      case 'landPrice':
+        if (value > 1000000) { element.classList.add('warning'); }
+        break;
+    }
+    return true;
+  }
+
+  calculate() {
+    if (this.isCalculating) return;
+    this.isCalculating = true;
+    try {
+      this.clearValidation();
+      const inputs = this.collectInputs();
+      const results = this.performCalculations(inputs, {applySolver:true});
+      this.updateOutputs(results);
+      this.updateStatus(results);
+    } catch (error) {
+      console.error('Calculation error:', error);
+      this.showError('เกิดข้อผิดพลาดในการคำนวณ');
+    } finally {
+      this.isCalculating = false;
+    }
+  }
+
+  collectInputs() {
+    return {
+      rai: this.getNumValue('rai'),
+      ngan: this.getNumValue('ngan'),
+      sqw: this.getNumValue('sqw'),
+      far: this.getNumValue('far'),
+      bonusFar: this.getNumValue('bonusFar'),
+      efficiency: this.getNumValue('efficiency') / 100,
+      landPrice: this.getNumValue('landPrice'),
+      landTax: this.getNumValue('landTax') / 100,
+      constructionCost: this.getNumValue('constructionCost'),
+      sellingPrice: this.getNumValue('sellingPrice'),
+      targetGM: this.getNumValue('targetGM') / 100,
+      netProfitPct: this.getNumValue('netProfitPct') / 100
+    };
+  }
+
+  getNumValue(id) {
+    const value = parseFloat(this.elements[id]?.value) || 0;
+    return isFinite(value) ? Math.max(0, value) : 0;
+  }
+
+  // Core computation that can opt-out solver (used by sensitivity)
+  performCalculations(inputs, options={applySolver:true}) {
+    const results = {};
+    const optSolver = options.applySolver !== false;
+
+    // Basic area calculations
+    results.landSqw = inputs.rai * 400 + inputs.ngan * 100 + inputs.sqw;
+    results.landSqm = results.landSqw * 4;
+    results.totalFAR = inputs.far * (1 + inputs.bonusFar / 100);
+    results.gfa = results.landSqm * results.totalFAR;
+    results.nsa = results.gfa * inputs.efficiency;
+
+    // Validation
+    if (results.landSqw === 0) this.addValidationError('กรุณาระบุขนาดที่ดิน');
+    if (inputs.far === 0) this.addValidationError('กรุณาระบุ FAR');
+    if (inputs.efficiency === 0) this.addValidationError('กรุณาระบุ Efficiency');
+
+    // Cost calculations
+    results.totalLandCost = results.landSqw * inputs.landPrice * (1 + inputs.landTax);
+    results.totalConstructionCost = results.gfa * inputs.constructionCost;
+    results.totalDevCost = results.totalLandCost + results.totalConstructionCost;
+
+    // Unit costs
+    results.landCostPerNSA = results.nsa > 0 ? results.totalLandCost / results.nsa : 0;
+    results.constructionCostPerNSA = inputs.efficiency > 0 ? inputs.constructionCost / inputs.efficiency : 0;
+
+    // Two-way solver (optional)
+    if (optSolver) this.applySolver(inputs, results);
+
+    // Financial metrics
+    results.projectValue = results.nsa * inputs.sellingPrice;
+    results.cogs = results.projectValue > 0 ? results.totalDevCost / results.projectValue * 100 : NaN;
+    results.grossMargin = this.calculateGrossMargin(inputs, results);
+    results.netProfit = results.projectValue * inputs.netProfitPct;
+
+    // echo inputs (for table/report)
+    results.inputs = JSON.parse(JSON.stringify(inputs));
+    return results;
+  }
+
+  applySolver(inputs, results) {
+    switch (this.solverMode) {
+      case 'selling':
+        if (results.nsa > 0 && inputs.targetGM < 1) {
+          const denominator = 1 - inputs.targetGM;
+          const newSellingPrice = (results.constructionCostPerNSA + results.landCostPerNSA) / denominator;
+          if (isFinite(newSellingPrice) && newSellingPrice > 0) {
+            this.elements.sellingPrice.value = Math.round(newSellingPrice);
+            inputs.sellingPrice = newSellingPrice;
+          }
+        }
+        break;
+      case 'land':
+        if (results.nsa > 0 && inputs.sellingPrice > 0) {
+          const targetLandCostPerNSA = inputs.sellingPrice * (1 - inputs.targetGM) - results.constructionCostPerNSA;
+          const targetTotalLandCost = targetLandCostPerNSA * results.nsa;
+          const newLandPrice = results.landSqw > 0 ? targetTotalLandCost / (results.landSqw * (1 + inputs.landTax)) : 0;
+          if (isFinite(newLandPrice) && newLandPrice >= 0) {
+            this.elements.landPrice.value = Math.round(newLandPrice);
+            inputs.landPrice = newLandPrice;
+            results.totalLandCost = results.landSqw * newLandPrice * (1 + inputs.landTax);
+            results.landCostPerNSA = results.totalLandCost / results.nsa;
+          }
+        }
+        break;
+      case 'construction':
+        if (results.nsa > 0 && inputs.sellingPrice > 0 && inputs.efficiency > 0) {
+          const targetCCPerNSA = inputs.sellingPrice * (1 - inputs.targetGM) - results.landCostPerNSA;
+          const newConstructionCost = targetCCPerNSA * inputs.efficiency;
+          if (isFinite(newConstructionCost) && newConstructionCost >= 0) {
+            this.elements.constructionCost.value = Math.round(newConstructionCost);
+            inputs.constructionCost = newConstructionCost;
+            results.totalConstructionCost = results.gfa * newConstructionCost;
+            results.constructionCostPerNSA = newConstructionCost / inputs.efficiency;
+          }
+        }
+        break;
+    }
+  }
+
+  calculateGrossMargin(inputs, results) {
+    if (inputs.sellingPrice === 0 || results.nsa === 0) return NaN;
+    const sp = inputs.sellingPrice;
+    const landCostPerNSA = results.nsa > 0 ? results.totalLandCost / results.nsa : NaN;
+    const ccPerNSA = results.nsa > 0 ? results.totalConstructionCost / results.nsa : NaN;
+    if (!isFinite(landCostPerNSA) || !isFinite(ccPerNSA)) return NaN;
+    return ((sp - landCostPerNSA - ccPerNSA) / sp) * 100;
+  }
+
+  updateOutputs(results) {
+    this.setElementValue('outputLandSqw', this.formatNumber(results.landSqw, 0));
+    this.setElementValue('outputLandSqm', this.formatNumber(results.landSqm, 0));
+    this.setElementValue('outputGFA', this.formatNumber(results.gfa, 0));
+    this.setElementValue('outputNSA', this.formatNumber(results.nsa, 0));
+    
+    this.setElementValue('outputTotalLandCost', this.formatCurrency(results.totalLandCost));
+    this.setElementValue('outputTotalConCost', this.formatCurrency(results.totalConstructionCost));
+    this.setElementValue('outputTotalDevCost', this.formatCurrency(results.totalDevCost));
+    
+    this.setElementValue('outputProjectValue', this.formatCurrency(results.projectValue));
+    this.setElementValue('outputNetProfit', this.formatCurrency(results.netProfit));
+    this.setElementValue('outputGM', this.formatPercent(results.grossMargin));
+    this.setElementValue('outputCOGS', this.formatPercent(results.cogs));
+  }
+
+  updateStatus(results) {
+    const statusEl = this.elements.feasibilityStatus;
+    const gm = results.grossMargin;
+
+    if (this.validationErrors.length > 0) {
+      statusEl.className = 'status bad';
+      statusEl.textContent = 'กรุณาแก้ไขข้อผิดพลาดก่อนดำเนินการ';
+    } else if (isFinite(gm) && gm >= 28) {
+      statusEl.className = 'status good';
+      statusEl.textContent = `โครงการผ่านเกณฑ์ • GM ≈ ${gm.toFixed(1)}%`;
+    } else if (isFinite(gm) && gm >= 20) {
+      statusEl.className = 'status ok';
+      statusEl.textContent = `โครงการพอได้ • GM ≈ ${gm.toFixed(1)}%`;
+    } else if (isFinite(gm)) {
+      statusEl.className = 'status bad';
+      statusEl.textContent = `กำไรต่ำกว่าเป้า • GM ≈ ${gm.toFixed(1)}%`;
+    } else {
+      statusEl.className = 'status info';
+      statusEl.textContent = 'กรอกข้อมูลให้ครบเพื่อคำนวณผลลัพธ์';
+    }
+
+    this.showValidationMessages();
+  }
+
+  clearValidation() {
+    this.validationErrors = [];
+    this.validationWarnings = [];
+    this.elements.errorAlert.style.display = 'none';
+    this.elements.warningAlert.style.display = 'none';
+  }
+
+  addValidationError(message) { if (!this.validationErrors.includes(message)) this.validationErrors.push(message); }
+  addValidationWarning(message) { if (!this.validationWarnings.includes(message)) this.validationWarnings.push(message); }
+
+  showValidationMessages() {
+    if (this.validationErrors.length > 0) {
+      this.elements.errorAlert.textContent = this.validationErrors.join(' • ');
+      this.elements.errorAlert.style.display = 'block';
+    }
+    if (this.validationWarnings.length > 0) {
+      this.elements.warningAlert.textContent = this.validationWarnings.join(' • ');
+      this.elements.warningAlert.style.display = 'block';
+    }
+  }
+
+  showError(message) {
+    this.elements.errorAlert.textContent = message;
+    this.elements.errorAlert.style.display = 'block';
+  }
+
+  setElementValue(id, value) {
+    const element = this.elements[id];
+    if (element) {
+      element.textContent = value;
+      const numValue = parseFloat((value || '').toString().replace(/[,%₿]/g, ''));
+      if (isFinite(numValue)) {
+        element.classList.toggle('negative', numValue < 0);
+        element.classList.toggle('positive', numValue > 0 && id.includes('Profit'));
+      }
+    }
+  }
+
+  formatNumber(num, decimals = 0) {
+    if (!isFinite(num)) return '-';
+    return num.toLocaleString('th-TH', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  }
+
+  formatCurrency(num) {
+    if (!isFinite(num) || num === 0) return '-';
+    if (num >= 1_000_000) return `₿${(num / 1_000_000).toFixed(1)}M`;
+    if (num >= 1_000) return `₿${(num / 1_000).toFixed(0)}K`;
+    return `₿${this.formatNumber(num)}`;
+  }
+
+  formatPercent(num, decimals = 1) {
+    if (!isFinite(num)) return '-';
+    return `${num.toFixed(decimals)}%`;
+  }
+
+  // Utility methods for header actions
+  reset() {
+    const inputs = ['rai', 'ngan', 'sqw', 'far', 'bonusFar', 'efficiency', 
+                   'landPrice', 'landTax', 'constructionCost', 'sellingPrice', 
+                   'targetGM', 'netProfitPct'];
+    
+    const defaults = {
+      rai: 0, ngan: 0, sqw: 0, far: 0, bonusFar: 0, efficiency: 80,
+      landPrice: 0, landTax: 3, constructionCost: 24000, sellingPrice: 65000,
+      targetGM: 25, netProfitPct: 10
+    };
+    
+    inputs.forEach(id => {
+      if (this.elements[id]) {
+        this.elements[id].value = defaults[id] || 0;
+        this.elements[id].classList.remove('error', 'warning');
+      }
+    });
+    this.calculate();
+  }
+
+  exportData() {
+    const inputs = this.collectInputs();
+    const results = this.performCalculations(inputs, {applySolver:true});
+    const exportData = { timestamp: new Date().toISOString(), inputs, results, solverMode: this.solverMode };
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `land-pre-fs-${Date.now()}.json`;
+    link.click();
+  }
+
+  savePreset() {
+    const presetName = prompt('ชื่อ Preset:');
+    if (presetName) {
+      const presetData = this.collectInputs();
+      localStorage.setItem(`preset_${presetName}`, JSON.stringify(presetData));
+      alert(`บันทึก Preset "${presetName}" เรียบร้อย`);
+    }
+  }
+
+  // ===== Sensitivity =====
+  
+  runSensitivity() {
+    const param = this.elements.senParam.value;
+    const min = parseFloat(this.elements.senMin.value);
+    const max = parseFloat(this.elements.senMax.value);
+    const steps = Math.max(3, Math.min(51, parseInt(this.elements.senSteps.value)));
+    const inc = Math.max(0, parseFloat((this.elements.senInc && this.elements.senInc.value) ? this.elements.senInc.value : 0));
+    if (!isFinite(min) || !isFinite(max) || max <= min) { alert('ช่วง Min/Max ไม่ถูกต้อง'); return; }
+
+    const inputsBase = this.collectInputs();
+
+    // Build values array either by increment (tick) or by steps
+    let values = [];
+    if (inc > 0) {
+      // align start and end to increment grid
+      const start = (param === 'efficiency')
+        ? Math.ceil(min / inc) * inc
+        : Math.ceil(min / inc) * inc;
+      for (let v = start; v <= max + 1e-9; v += inc) {
+        values.push(v);
+        if (values.length > 2000) break; // safety
+      }
+    } else {
+      // evenly spaced steps
+      values = Array.from({length: steps}, (_,i)=> min + (max-min)*i/(steps-1));
+    }
+
+    const rows = [];
+    const labels = [];
+    const series = [];
+
+    for (const raw of values) {
+      // For efficiency param, treat value as percent (no /inc rounding beyond above)
+      const v = raw;
+      const inputs = JSON.parse(JSON.stringify(inputsBase));
+      if (param === 'efficiency') inputs.efficiency = Math.max(0, v/100);
+      else if (param === 'far') inputs.far = Math.max(0, v);
+      else if (param === 'constructionCost') inputs.constructionCost = Math.max(0, v);
+      else if (param === 'landPrice') inputs.landPrice = Math.max(0, v);
+
+      // compute without solver side‑effects
+      const res = this.performCalculations(inputs, {applySolver:false});
+      const denom = (1 - inputs.targetGM);
+      const requiredSP = (res.nsa > 0 && inputs.efficiency > 0 && denom > 0)
+        ? (res.landCostPerNSA + res.constructionCostPerNSA) / denom
+        : NaN;
+      const gmCalc = isFinite(requiredSP)
+        ? ((requiredSP - res.landCostPerNSA - res.constructionCostPerNSA) / requiredSP) * 100
+        : NaN;
+
+      rows.push({ param: v, reqSP: requiredSP, gm: gmCalc });
+      labels.push(this.formatNumber(v, (param==='efficiency')?1:0));
+      series.push(requiredSP);
+    }
+
+    this.senData = {param, rows, labels, series, inc};
+    this.renderSensitivityTable();
+    this.renderSensitivityChart();
+  }
+
+  renderSensitivityTable() {
+    const tbody = this.elements.senTableBody;
+    tbody.innerHTML = '';
+    this.senData.rows.forEach((r, idx) => {
+      const tr = document.createElement('tr');
+      const cells = [
+        idx+1,
+        (this.senData.param==='efficiency'? (r.param.toFixed(1)+'%') : this.formatNumber(r.param)),
+        (isFinite(r.reqSP)? this.formatNumber(r.reqSP, 0) : '-'),
+        (isFinite(r.gm)? r.gm.toFixed(2)+'%' : '-')
+      ];
+      cells.forEach(c=>{ const td=document.createElement('td'); td.textContent=c; tr.appendChild(td); });
+      tbody.appendChild(tr);
+    });
+  }
+
+  
+  renderSensitivityChart() {
+    const ctx = this.elements.senChartCanvas.getContext('2d');
+    const labelMap = {
+      sellingPrice: 'ราคาขาย/ตร.ม. (NSA)',
+      constructionCost: 'ค่าก่อสร้าง/ตร.ม. (GFA)',
+      landPrice: 'ราคาที่ดิน/ตร.วา',
+      efficiency: 'Efficiency (%)',
+      far: 'FAR (base)'
+    };
+    const xLabel = labelMap[this.senData.param] || 'Parameter';
+    const yLabel = 'Required SP/ตร.ม.';
+
+    if (this.senChart) { this.senChart.destroy(); }
+    this.senChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: this.senData.labels,
+        datasets: [{
+          label: `${yLabel} vs ${xLabel}`,
+          data: this.senData.series,
+          fill: false,
+          tension: 0.2
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: true },
+          tooltip: { enabled: true }
+        },
+        scales: {
+          x: { title: { display: true, text: xLabel } },
+          y: { title: { display: true, text: yLabel }, beginAtZero: false }
+        }
+      }
+    });
+  }
+
+  exportSensitivityCSV() {
+    if (!this.senData || !this.senData.rows || this.senData.rows.length===0) {
+      alert('ยังไม่มีผลลัพธ์ Sensitivity'); return;
+    }
+    const header = ['index','parameter','GM_%','COGS_%','ProjectValue_THB','NetProfit_THB'];
+    const lines = [header.join(',')];
+    this.senData.rows.forEach((r, idx)=>{
+      const p = (this.senData.param==='efficiency') ? r.param.toFixed(1)+'%' : r.param;
+      const row = [
+        idx+1,
+        p,
+        isFinite(r.GM)? r.GM.toFixed(4):'',
+        isFinite(r.COGS)? r.COGS.toFixed(4):'',
+        isFinite(r.PV)? Math.round(r.PV):'',
+        isFinite(r.NP)? Math.round(r.NP):''
+      ];
+      lines.push(row.join(','));
+    });
+    const blob = new Blob([lines.join('\n')], {type:'text/csv'});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `sensitivity_${this.senData.param}_${Date.now()}.csv`;
+    link.click();
+  }
+}
+
+// Initialize calculator when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+  window.calculator = new LandFeasibilityCalculator();
+});
+</script>
+</body>
+</html>
