@@ -33,11 +33,11 @@ export function parseInputsFromParams(searchParams: URLSearchParams): Inputs {
     if (raw === null) continue;
 
     if (STRING_FIELDS.has(inputKey)) {
-      (inputs as Record<string, any>)[inputKey] = raw;
+      (inputs as Record<string, string | number>)[inputKey] = raw;
     } else {
       const num = Number(raw);
       if (!Number.isNaN(num)) {
-        (inputs as Record<string, any>)[inputKey] = num;
+        (inputs as Record<string, string | number>)[inputKey] = num;
       }
     }
   }

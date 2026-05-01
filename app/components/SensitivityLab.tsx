@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useRef } from "react";
+import { toPng } from "html-to-image";
+import { toast } from "sonner";
 import { Inputs } from "../lib/types";
 import { runSensitivityAnalysis, SensitivityParam, SensitivityKPI } from "../lib/sensitivity";
 import { formatNumber } from "../lib/format";
@@ -12,36 +14,34 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  ReferenceLine,
 } from "recharts";
-import { FlaskConical, Settings2, Info } from "lucide-react";
+import { FlaskConical, Download, Copy, Check, Info } from "lucide-react";
 
 interface SensitivityLabProps {
   inputs: Inputs;
+}
+
+function getDefaultRange(param: SensitivityParam, landPrice: number) {
+  if (param === "landPrice") return { min: landPrice * 0.5, max: landPrice * 1.5 };
+  if (param === "constructionCost") return { min: 15000, max: 40000 };
+  if (param === "efficiency") return { min: 60, max: 90 };
+  if (param === "far") return { min: 1, max: 8 };
+  return { min: 0, max: 100 };
 }
 
 export default function SensitivityLab({ inputs }: SensitivityLabProps) {
   const [param, setParam] = useState<SensitivityParam>("landPrice");
   const [kpi, setKpi] = useState<SensitivityKPI>("requiredSellingPrice");
   const [steps, setSteps] = useState(11);
+  const [min, setMin] = useState(() => getDefaultRange("landPrice", inputs.landPrice).min);
+  const [max, setMax] = useState(() => getDefaultRange("landPrice", inputs.landPrice).max);
 
-  // Range defaults based on param
-  const range = useMemo(() => {
-    if (param === "landPrice") return { min: inputs.landPrice * 0.5, max: inputs.landPrice * 1.5 };
-    if (param === "constructionCost") return { min: 15000, max: 40000 };
-    if (param === "efficiency") return { min: 60, max: 90 };
-    if (param === "far") return { min: 1, max: 8 };
-    return { min: 0, max: 100 };
-  }, [param, inputs.landPrice]);
-
-  const [min, setMin] = useState(range.min);
-  const [max, setMax] = useState(range.max);
-
-  // Reset min/max when param changes
-  useEffect(() => {
+  const handleParamChange = (newParam: SensitivityParam) => {
+    setParam(newParam);
+    const range = getDefaultRange(newParam, inputs.landPrice);
     setMin(range.min);
     setMax(range.max);
-  }, [range]);
+  };
 
   const data = useMemo(() => {
     return runSensitivityAnalysis(inputs, param, min, max, steps);
@@ -61,13 +61,77 @@ export default function SensitivityLab({ inputs }: SensitivityLabProps) {
     far: "FAR",
   };
 
+  const chartRef = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleDownload = async () => {
+    if (!chartRef.current) return;
+    try {
+      const dataUrl = await toPng(chartRef.current, {
+        backgroundColor: "#ffffff",
+        pixelRatio: 2,
+        cacheBust: true,
+        filter: (node) =>
+          !(node instanceof HTMLElement && node.hasAttribute("data-html-to-image-exclude")),
+      });
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `sensitivity-${param}-${kpi}-${Date.now()}.png`;
+      link.click();
+      toast.success("Chart downloaded");
+    } catch {
+      toast.error("Download failed");
+    }
+  };
+
+  const handleCopyImage = async () => {
+    if (!chartRef.current) return;
+    try {
+      const blobPromise = toPng(chartRef.current, {
+        backgroundColor: "#ffffff",
+        pixelRatio: 2,
+        cacheBust: true,
+        filter: (node) =>
+          !(node instanceof HTMLElement && node.hasAttribute("data-html-to-image-exclude")),
+      })
+        .then((dataUrl) => fetch(dataUrl))
+        .then((res) => res.blob());
+
+      const item = new ClipboardItem({ "image/png": blobPromise });
+      await navigator.clipboard.write([item]);
+      setCopied(true);
+      toast.success("Chart copied to clipboard");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.warning("Copy not supported in this browser. Use Download instead.");
+    }
+  };
+
   return (
-    <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+    <div ref={chartRef} className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
       <div className="bg-gray-50/50 px-4 py-3 border-b border-gray-100 flex items-center justify-between">
         <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-          <FlaskConical className="w-4 h-4 text-sky-600" />
+          <FlaskConical className="w-4 h-4 text-[var(--excel-green)]" />
           Sensitivity Analysis Lab
         </h2>
+        <div className="flex items-center gap-2" data-html-to-image-exclude>
+          <button
+            type="button"
+            onClick={handleCopyImage}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--excel-green)] bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[var(--excel-green)] hover:bg-[var(--excel-green)]/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--excel-green)] focus-visible:ring-offset-2"
+          >
+            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? "Copied" : "Copy"}
+          </button>
+          <button
+            type="button"
+            onClick={handleDownload}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--excel-green)] bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[var(--excel-green)] hover:bg-[var(--excel-green)]/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--excel-green)] focus-visible:ring-offset-2"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Download
+          </button>
+        </div>
       </div>
 
       <div className="p-4 sm:p-6 space-y-6">
@@ -77,8 +141,8 @@ export default function SensitivityLab({ inputs }: SensitivityLabProps) {
             <label className="text-[10px] font-bold text-gray-400 uppercase">Variable (X)</label>
             <select
               value={param}
-              onChange={(e) => setParam(e.target.value as SensitivityParam)}
-              className="w-full bg-white border border-gray-200 rounded-lg h-9 px-2 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+              onChange={(e) => handleParamChange(e.target.value as SensitivityParam)}
+              className="w-full bg-white border border-gray-200 rounded-lg h-9 px-2 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--excel-green)]/20"
             >
               <option value="landPrice">Land Price</option>
               <option value="constructionCost">Construction Cost</option>
@@ -92,7 +156,7 @@ export default function SensitivityLab({ inputs }: SensitivityLabProps) {
             <select
               value={kpi}
               onChange={(e) => setKpi(e.target.value as SensitivityKPI)}
-              className="w-full bg-white border border-gray-200 rounded-lg h-9 px-2 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+              className="w-full bg-white border border-gray-200 rounded-lg h-9 px-2 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--excel-green)]/20"
             >
               <option value="requiredSellingPrice">Required Selling Price</option>
               <option value="grossMargin">Gross Margin %</option>
@@ -108,13 +172,13 @@ export default function SensitivityLab({ inputs }: SensitivityLabProps) {
                 type="number"
                 value={min}
                 onChange={(e) => setMin(Number(e.target.value))}
-                className="w-full bg-white border border-gray-200 rounded-lg h-9 px-2 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                className="w-full bg-white border border-gray-200 rounded-lg h-9 px-2 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--excel-green)]/20"
               />
               <input
                 type="number"
                 value={max}
                 onChange={(e) => setMax(Number(e.target.value))}
-                className="w-full bg-white border border-gray-200 rounded-lg h-9 px-2 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                className="w-full bg-white border border-gray-200 rounded-lg h-9 px-2 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--excel-green)]/20"
               />
             </div>
           </div>
@@ -128,7 +192,7 @@ export default function SensitivityLab({ inputs }: SensitivityLabProps) {
               step="2"
               value={steps}
               onChange={(e) => setSteps(Number(e.target.value))}
-              className="w-full h-9 accent-sky-600"
+              className="w-full h-9 accent-[var(--excel-green)]"
             />
           </div>
         </div>
@@ -152,14 +216,14 @@ export default function SensitivityLab({ inputs }: SensitivityLabProps) {
               <Tooltip 
                 contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                 labelFormatter={(val) => `${paramLabels[param]}: ${param === 'efficiency' ? val + '%' : formatNumber(val)}`}
-                formatter={(val: any) => [kpi === 'grossMargin' ? Number(val).toFixed(2) + '%' : formatNumber(Math.round(Number(val))), kpiLabels[kpi]]}
+                formatter={(val) => [kpi === 'grossMargin' ? Number(val).toFixed(2) + '%' : formatNumber(Math.round(Number(val))), kpiLabels[kpi]]}
               />
               <Line 
                 type="monotone" 
                 dataKey={kpi} 
-                stroke="#0284c7" 
+                stroke="#107c41" 
                 strokeWidth={3} 
-                dot={{ r: 4, fill: '#0284c7', strokeWidth: 2, stroke: '#fff' }}
+                dot={{ r: 4, fill: '#107c41', strokeWidth: 2, stroke: '#fff' }}
                 activeDot={{ r: 6, strokeWidth: 0 }}
               />
             </LineChart>
@@ -167,9 +231,9 @@ export default function SensitivityLab({ inputs }: SensitivityLabProps) {
         </div>
 
         {/* Info box */}
-        <div className="flex items-start gap-3 p-3 rounded-lg bg-sky-50 border border-sky-100">
-          <Info className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
-          <p className="text-[11px] text-sky-800 leading-relaxed">
+        <div className="flex items-start gap-3 p-3 rounded-lg bg-[var(--excel-green)]/[0.04] border border-[var(--excel-green)]/10">
+          <Info className="w-4 h-4 text-[var(--excel-green)] shrink-0 mt-0.5" />
+          <p className="text-[11px] text-gray-700 leading-relaxed">
             <strong>Analysis Logic:</strong> This lab recalculates the entire project feasibility for each step on the X-axis. 
             {kpi === 'requiredSellingPrice' && " 'Required Selling Price' shows the price point needed to maintain your Target GM% as costs change."}
             {kpi === 'grossMargin' && " 'Gross Margin %' shows how your profitability fluctuates if the Selling Price remains fixed at your current input."}

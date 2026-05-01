@@ -13,7 +13,7 @@ export const InputsSchema = z.object({
   constructionCost: z.number().min(0),
   sellingPrice: z.number().min(0),
   targetGM: z.number().min(0).max(0.6), // as decimal
-  netProfitPct: z.number().min(0).max(0.3), // as decimal
+  netProfitPct: z.number().min(0).max(0.3), // net margin assumption (decimal), applied to project revenue
 });
 
 export type Inputs = z.infer<typeof InputsSchema>;

@@ -6,7 +6,7 @@ export default defineConfig({
     include: ["**/*.test.ts", "**/*.test.tsx"],
     coverage: {
       provider: "v8",
-      include: ["app/lib/calculate.ts"],
+      include: ["app/lib/**"],
       exclude: ["**/*.test.ts", "**/*.test.tsx", "node_modules"],
     },
   },

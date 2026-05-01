@@ -1,4 +1,4 @@
-import { Inputs, CalculationResult } from "./types";
+import { Inputs } from "./types";
 import { calculateProjection } from "./calculate";
 
 export type SensitivityParam = "landPrice" | "constructionCost" | "efficiency" | "far";
